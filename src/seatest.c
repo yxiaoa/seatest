@@ -7,10 +7,9 @@ int seatest_is_string_equal_i(const char* s1, const char* s2)
 	#pragma warning(disable: 4996)  
 	return stricmp(s1, s2) == 0;
 }
-
 #else
-#include <strings.h>
-unsigned int GetTickCount() { return 0;}
+//#include <strings.h>
+unsigned int GetTickCount(void) { return 0;}
 void _getch( void ) { }
 int seatest_is_string_equal_i(const char* s1, const char* s2)
 {
@@ -26,20 +25,20 @@ static int sea_test_last_passed = 0;
 #define SEATEST_RET_OK									0
 #define SEATEST_RET_FAILED_COUNT(tests_failed_count)	(tests_failed_count)
 
-typedef enum
-{
+typedef enum {
 	SEATEST_DISPLAY_TESTS,
 	SEATEST_RUN_TESTS,
 	SEATEST_DO_NOTHING,
 	SEATEST_DO_ABORT
 } seatest_action_t;
 
-typedef struct
-{
+typedef struct {
 	int argc;
-	char** argv;
+	char **argv;
 	seatest_action_t action;
+	char unused[3];
 } seatest_testrunner_t;
+
 static int seatest_screen_width = 70;
 static int sea_tests_run = 0;
 static int sea_tests_passed = 0;
@@ -48,8 +47,8 @@ static int seatest_display_only = 0;
 static int seatest_verbose = 0;
 static int vs_mode = 0;
 static int seatest_machine_readable = 0;
-static char* seatest_current_fixture;
-static char* seatest_current_fixture_path;
+static const char* seatest_current_fixture;
+static const char* seatest_current_fixture_path;
 static char seatest_magic_marker[20] = "";
 
 static seatest_void_void seatest_suite_setup_func = 0;
@@ -57,7 +56,7 @@ static seatest_void_void seatest_suite_teardown_func = 0;
 static seatest_void_void seatest_fixture_setup = 0;
 static seatest_void_void seatest_fixture_teardown = 0;
 
-void (*seatest_simple_test_result)(int passed, char* reason, const char* function, unsigned int line) = seatest_simple_test_result_log;
+void (*seatest_simple_test_result)(int passed, const char* reason, const char* function, unsigned int line) = seatest_simple_test_result_log;
 
 void suite_setup(seatest_void_void setup)
 {
@@ -68,7 +67,7 @@ void suite_teardown(seatest_void_void teardown)
 	seatest_suite_teardown_func = teardown;
 }
 
-int seatest_is_display_only()
+int seatest_is_display_only(void)
 {
 	return seatest_display_only;
 }
@@ -102,9 +101,9 @@ void seatest_teardown( void )
 	if(seatest_fixture_teardown != 0) seatest_fixture_teardown();
 }
 
-char* test_file_name(char* path)
+const char* test_file_name(const char* path)
 {
-	char* file = path + strlen(path);
+	const char* file = path + strlen(path);
 	while(file != path && *file!= '\\' ) file--;
 	if(*file == '\\') file++;
 	return file;
@@ -114,7 +113,7 @@ static int seatest_fixture_tests_run;
 static int seatest_fixture_tests_failed;
 
 
-void seatest_simple_test_result_log(int passed, char* reason, const char* function, unsigned int line)
+void seatest_simple_test_result_log(int passed, const char* reason, const char* function, unsigned int line)
 {
 	if (!passed)
 	{
@@ -196,8 +195,8 @@ void seatest_assert_float_equal( float expected, float actual, float delta, cons
 {
 	char s[SEATEST_PRINT_BUFFER_SIZE];
 	float result = expected-actual;
-	sprintf(s, "Expected %f but was %f", expected, actual);
-	if(result < 0.0) result = 0.0f - result;
+	sprintf(s, "Expected %f but was %f", (double)expected, (double)actual);
+	if((double)result < 0.0) result = 0.0f - result;
 	seatest_simple_test_result( result <= delta, s, function, line);	
 }
 
@@ -267,14 +266,14 @@ void seatest_assert_string_doesnt_contain(const char* expected, const char* actu
 	seatest_simple_test_result(strstr(actual, expected)==0, s, function, line);	
 }
 
-void seatest_run_test(char* fixture, char* test)
+void seatest_run_test(const char* fixture, const char* test)
 {
 	sea_tests_run++; 
 }
 
-void seatest_header_printer(char* s, int length, char f)
+void seatest_header_printer(const char* s, int length, char f)
 {
-	int l = strlen(s);
+	int l = (int)strlen(s);
 	int d = (length- (l + 2)) / 2;
 	int i;
 	if(seatest_is_display_only() || seatest_machine_readable) return;
@@ -286,7 +285,7 @@ void seatest_header_printer(char* s, int length, char f)
 }
 
 
-void seatest_test_fixture_start(char* filepath)
+void seatest_test_fixture_start(const char* filepath)
 {
 	seatest_current_fixture_path = filepath;
 	seatest_current_fixture = test_file_name(filepath);
@@ -353,7 +352,7 @@ int seatest_should_run( char* fixture, char* test)
 	return run;
 }
 
-void seatest_test(char* fixture, char* test, void (*test_function)(void))
+void seatest_test(const char* fixture, const char* test, void (*test_function)(void))
 {
 	seatest_suite_setup(); 
 	seatest_setup(); 
@@ -376,7 +375,7 @@ int run_tests(seatest_void_void tests)
 	unsigned long start = GetTickCount();
 	char version[40];
 	char s[40];
-	tests();	 
+	tests();
 	end = GetTickCount();
 
 	if(seatest_is_display_only() || seatest_machine_readable) return SEATEST_RET_OK;
@@ -473,32 +472,24 @@ void seatest_testrunner_create(seatest_testrunner_t* runner, int argc, char** ar
 int seatest_testrunner(int argc, char** argv, seatest_void_void tests, seatest_void_void setup, seatest_void_void teardown)
 {
 	seatest_testrunner_t runner;
-	seatest_testrunner_create(&runner, argc, argv);	
-	switch(runner.action)
-	{
-	case SEATEST_DISPLAY_TESTS:
-		{
-			seatest_display_only = 1;
-			run_tests(tests);
-			return SEATEST_RET_OK;
-		}
-	case SEATEST_RUN_TESTS:
-		{
-			seatest_display_only = 0;
-			suite_setup(setup);
-			suite_teardown(teardown);
-			return run_tests(tests);
-		}
-	case SEATEST_DO_NOTHING:
-		{
-			return SEATEST_RET_OK;
-		}
+	seatest_testrunner_create(&runner, argc, argv);
+	switch (runner.action) {
+	case SEATEST_DISPLAY_TESTS: {
+		seatest_display_only = 1;
+		run_tests(tests);
+		return SEATEST_RET_OK;
+	}
+	case SEATEST_RUN_TESTS: {
+		seatest_display_only = 0;
+		suite_setup(setup);
+		suite_teardown(teardown);
+		return run_tests(tests);
+	}
+	case SEATEST_DO_NOTHING: {
+		return SEATEST_RET_OK;
+	}
 	case SEATEST_DO_ABORT:
-	default:
-		{
-			/* there was an error which should of been already printed out. */
-			return SEATEST_RET_ERROR;
-		}
+		break;
 	}
 	return SEATEST_RET_ERROR;
 }
